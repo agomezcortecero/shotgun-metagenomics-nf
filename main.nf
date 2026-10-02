@@ -1,47 +1,37 @@
+nextflow.enable.dsl=2
+
 /*
 ========================================================================================
     Shotgun Metagenomics Nextflow DSL2 Pipeline
 ========================================================================================
-    Description: End-to-end modular pipeline for shotgun metagenomics (QC, Taxonomy,
-                 Assembly, Functional Annotation & Coverage).
-========================================================================================
 */
 
-nextflow.enable.dsl = 2
-
-// Include modules
-include { FASTP }                       from './modules/fastp'
-include { MOTUS_PROFILE; MOTUS_MERGE }  from './modules/motus'
-include { MEGAHIT }                     from './modules/megahit'
-include { EGGNOG_MAPPER }               from './modules/eggnog'
-include { COVERM }                      from './modules/coverm'
-include { MULTIQC }                     from './modules/multiqc'
+include { FASTP }       from './modules/fastp'
+include { MOTUS }       from './modules/motus'
+include { MEGAHIT }     from './modules/megahit'
+include { EGGNOG }      from './modules/eggnog'
+include { COVERM }      from './modules/coverm'
+include { MULTIQC }     from './modules/multiqc'
 
 workflow {
+    ch_raw_reads = Channel.fromFilePairs(params.input, checkIfExists: true)
 
-    // 1. Channel creation from read pairs
-    ch_reads = Channel.fromFilePairs(params.reads, checkIfExists: true)
+    // Step 1: Quality Control & Filtering
+    FASTP(ch_raw_reads)
 
-    // 2. Read Quality Control & Trimming (fastp)
-    FASTP(ch_reads)
+    // Step 2: Taxonomic Profiling with mOTUs
+    MOTUS(FASTP.out.reads)
 
-    // 3. Taxonomic Profiling (mOTUs)
-    MOTUS_PROFILE(FASTP.out.reads)
-    ch_motus_profiles = MOTUS_PROFILE.out.profile.map { sample_id, profile -> profile }.collect()
-    MOTUS_MERGE(ch_motus_profiles)
-
-    // 4. De novo Metagenomic Assembly (MEGAHIT)
+    // Step 3: De Novo Metagenomic Assembly
     MEGAHIT(FASTP.out.reads)
 
-    // 5. Functional Annotation (EggNOG-mapper)
-    ch_eggnog_db = file(params.eggnog_db)
-    EGGNOG_MAPPER(MEGAHIT.out.contigs, ch_eggnog_db)
+    // Step 4: Functional Annotation
+    EGGNOG(MEGAHIT.out.contigs)
 
-    // 6. Contig Abundance & Coverage Quantification (CoverM)
-    ch_coverm_input = FASTP.out.reads.join(MEGAHIT.out.contigs)
-    COVERM(ch_coverm_input)
+    // Step 5: Contig Coverage & Abundance Quantification
+    COVERM(FASTP.out.reads, MEGAHIT.out.contigs)
 
-    // 7. MultiQC Aggregate Report
-    ch_multiqc_inputs = FASTP.out.json.collect()
-    MULTIQC(ch_multiqc_inputs)
+    // Step 6: MultiQC Consolidated Quality Report
+    ch_multiqc_files = FASTP.out.json.mix(MOTUS.out.report).mix(MEGAHIT.out.log)
+    MULTIQC(ch_multiqc_files.collect())
 }

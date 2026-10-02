@@ -1,0 +1,22 @@
+name: Pipeline CI Test
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Nextflow
+        run: |
+          wget -qO- https://get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+
+      - name: Run Nextflow syntax check
+        run: |
+          nextflow config main.nf

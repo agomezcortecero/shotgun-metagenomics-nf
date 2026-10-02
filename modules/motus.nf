@@ -1,38 +1,21 @@
-process MOTUS_PROFILE {
+process MOTUS {
     tag "$sample_id"
-    label 'process_medium'
-    publishDir "${params.outdir}/taxonomy/mOTUs", mode: 'copy'
+    container 'quay.io/biocontainers/motus:3.1.0--pyhdfd78af_0'
+    publishDir "${params.outdir}/motus", mode: 'copy'
 
     input:
-    tuple val(sample_id), path(r1), path(r2)
+    tuple val(sample_id), path(reads)
 
     output:
-    tuple val(sample_id), path("${sample_id}.motus_results.tsv"), emit: profile
+    tuple val(sample_id), path("${sample_id}_motus.tsv"), emit: profile
+    path "${sample_id}_motus.log"                       , emit: report
 
     script:
     """
-    motus profile \
-        -f ${r1} \
-        -r ${r2} \
-        -n ${sample_id} \
-        -o ${sample_id}.motus_results.tsv \
-        -t ${task.cpus}
-    """
-}
-
-process MOTUS_MERGE {
-    publishDir "${params.outdir}/taxonomy/merged", mode: 'copy'
-
-    input:
-    path profiles
-
-    output:
-    path "merged_motus_profile.tsv", emit: merged_profile
-
-    script:
-    """
-    motus merge \
-        -i ${profiles.join(',')} \
-        -o merged_motus_profile.tsv
+    motus profile \\
+        -f ${reads[0]} -r ${reads[1]} \\
+        -n ${sample_id} \\
+        -o ${sample_id}_motus.tsv \\
+        -t ${task.cpus} > ${sample_id}_motus.log
     """
 }

@@ -1,14 +1,15 @@
 process MULTIQC {
-    publishDir "${params.outdir}/qc/multiqc", mode: 'copy'
+    container 'quay.io/biocontainers/multiqc:1.14--pyhdfd78af_0'
+    publishDir "${params.outdir}/multiqc", mode: 'copy'
 
     input:
-    path qc_files
+    path '*'
 
     output:
-    path "multiqc_report.html", emit: report
+    path "multiqc_report.html"
 
     script:
     """
-    multiqc . -n multiqc_report.html
+    multiqc .
     """
 }
